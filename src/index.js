@@ -2,9 +2,12 @@ const {
   BaseKonnector,
   requestFactory,
   saveBills,
-  log
+  saveFiles,
+  log,
+  errors
 } = require('cozy-konnector-libs')
 const request = requestFactory({
+  debug: true,
   json: false,
   jar: true
 })
@@ -16,21 +19,37 @@ module.exports = new BaseKonnector(start)
 
 async function start(fields) {
   log('info', 'Authenticating ...')
-  await authenticate(fields.login, fields.password)
   log('info', 'Successfully logged in')
+  await authenticate(fields.login, fields.password)
   log('info', 'Parsing list of documents')
-  const documents = await parseDocuments()
-  await saveBills(documents, fields, {
+  const { docs, bills } = await parseDocuments()
+  log('info', 'Saving bills...')
+  await saveBills(bills, fields, {
     identifiers: ['ddfip']
+  })
+  log('info', 'Saving docs...')
+  await saveFiles(docs, fields.folderPath, {
+    contentType: 'application/pdf'
   })
 }
 
-function authenticate(username, password) {
-  return request({
+async function authenticate(username, password) {
+  const resp = await request({
     uri: `${baseUrl}/authentification`,
     method: 'POST',
     formData: { identifiant: username, secret: password }
   })
+  if (resp.includes('Identifiant ou mot de passe erroné')) {
+    throw new Error(errors.LOGIN_FAILED)
+  } else if (resp.includes('Authentification OK')) {
+    return
+  } else if (resp.includes('Ce compte est temporairement bloqué pendant')) {
+    log('error', resp)
+    throw new Error('LOGIN_FAILED.TOO_MANY_ATTEMPTS')
+  } else {
+    log('error', resp)
+    throw new Error(errors.VENDOR_DOWN)
+  }
 }
 
 async function getYears() {
@@ -40,6 +59,7 @@ async function getYears() {
     return JSON.parse(req).donnee
   } catch (err) {
     log('error', err.message)
+    throw new Error(errors.VENDOR_DOWN)
   }
 }
 
@@ -59,6 +79,7 @@ async function parseDocuments() {
   // Get the available years for payrolls
   const years = await getYears()
   const docs = []
+  const bills = []
   for (const year of years) {
     // Get all the payrolls for a year
     const payrolls = await fetchPayrolls(year)
@@ -72,15 +93,32 @@ async function parseDocuments() {
         payroll.libelle3.replace(' ', '').replace(',', '.')
       )
       const vendor = VENDOR
-      const doc = {
-        date,
-        fileurl,
-        filename,
-        amount,
-        vendor
+
+      // This doc have no amount in libelle3, make a file only.
+      if (payroll.icone === 'rappel' || payroll.icone === 'attestation') {
+        const doc = {
+          fileurl,
+          filename
+        }
+        docs.push(doc)
+      } else if (payroll.icone === 'document') {
+        // This doc have amount, it's a bill !
+        const doc = {
+          date,
+          fileurl,
+          filename,
+          amount,
+          vendor,
+          vendorRef: uuid
+        }
+        bills.push(doc)
+      } else {
+        log(
+          'warn',
+          `Unkown type for one doc, discarding this one : ${payroll.icone}`
+        )
       }
-      docs.push(doc)
     }
   }
-  return docs
+  return { docs, bills }
 }
