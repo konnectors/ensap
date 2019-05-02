@@ -68,7 +68,7 @@
     },
     "en": {
       "short_description": "Fetch your pay slips",
-      "long_description": "Fetch on the ENSAP website:\n- Your pay slips\n- Your tax certificates\n- Your "décomptes de rappel",
+      "long_description": "Fetch on the ENSAP website:\n- Your pay slips\n- Your tax certificates\n- Your 'décomptes de rappel'",
       "permissions": {
         "bank operations": {
           "description": "Required to link bank operations to bills"
