@@ -25,7 +25,7 @@ async function start(fields) {
   const { docs, bills } = await parseDocuments()
   log('info', 'Saving bills...')
   await saveBills(bills, fields, {
-    identifiers: ['ddfip']
+    identifiers: ['ddfip', 'drfip']
   })
   log('info', 'Saving docs...')
   await saveFiles(docs, fields.folderPath, {
@@ -108,8 +108,10 @@ async function parseDocuments() {
           fileurl,
           filename,
           amount,
+          isRefund: true,
           vendor,
-          vendorRef: uuid
+          vendorRef: uuid,
+          type: 'income'
         }
         bills.push(doc)
       } else {
