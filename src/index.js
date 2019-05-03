@@ -91,7 +91,10 @@ async function parseDocuments() {
       // For each payroll, get the pdf url and metadata
       const uuid = payroll.documentUuid
       const fileurl = `${baseUrl}/prive/telechargerdocumentremuneration/v1?documentUuid=${uuid}`
-      const filename = payroll.nomDocument
+      // Try to replace _XX_ known type_
+      let filename = payroll.nomDocument.replace(/_AF_/,'_Attestation fiscale_')
+      filename = filename.replace(/_BP_/,'_Bulletin de paie_')
+      filename = filename.replace(/_DR_/,'_Décompte de rappel_')
       const date = new Date(payroll.dateDocument)
       const amount = parseFloat(
         payroll.libelle3.replace(' ', '').replace(',', '.')
