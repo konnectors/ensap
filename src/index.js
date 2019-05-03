@@ -91,8 +91,16 @@ async function parseDocuments() {
       // For each payroll, get the pdf url and metadata
       const uuid = payroll.documentUuid
       const fileurl = `${baseUrl}/prive/telechargerdocumentremuneration/v1?documentUuid=${uuid}`
-      const filename = payroll.nomDocument
-      const date = new Date(payroll.dateDocument)
+      // Try to replace _XX_ known type_
+      let filename = payroll.nomDocument.replace(
+        /_AF_/,
+        '_Attestation_fiscale_'
+      )
+      filename = filename.replace(/_BP_/, '_Bulletin_de_paie_')
+      filename = filename.replace(/_DR_/, '_Décompte_de_rappel_')
+      // Date is set to 22 of the month for easier matching, if not BP is always at 1st
+      let datePlus21 = new Date(payroll.dateDocument)
+      datePlus21.setDate(datePlus21.getDate() + 21)
       const amount = parseFloat(
         payroll.libelle3.replace(' ', '').replace(',', '.')
       )
@@ -108,7 +116,7 @@ async function parseDocuments() {
       } else if (payroll.icone === 'document') {
         // This doc have amount, it's a bill !
         const doc = {
-          date,
+          date: datePlus21,
           fileurl,
           filename,
           amount,

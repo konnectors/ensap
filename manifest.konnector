@@ -57,7 +57,7 @@
   "locales": {
     "fr": {
       "short_description": "Récupère vos bulletins de paie",
-      "long_description": "Récupère sur le service de l'ENSAP :\n- Vos bulletins de paie\n- Vos attestations fiscales\n- Mes décomptes de rappel",
+      "long_description": "Récupère sur le service de l'ENSAP :\n- Vos bulletins de paie\n- Vos attestations fiscales\n- Vos décomptes de rappel",
       "permissions": {
         "bank operations": {
           "description": "Utilisé pour relier les factures à des operations bancaires"
