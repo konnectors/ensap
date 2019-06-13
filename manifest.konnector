@@ -46,7 +46,7 @@
       ]
     },
     "identities": {
-      "type": "io.cozy.identites",
+      "type": "io.cozy.identities",
       "verbs": [ "GET", "POST"]
     }
   },
