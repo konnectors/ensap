@@ -59,8 +59,8 @@ async function getYears() {
   if (listeAnneeRemuneration && listeAnneeRemuneration.reverse) {
     return listeAnneeRemuneration.sort().reverse()
   } else {
-    log('error', 'could not find year of remuneration')
-    throw new Error(errors.VENDOR_DOWN)
+    log('warn', 'could not find year of remuneration')
+    return []
   }
 }
 
