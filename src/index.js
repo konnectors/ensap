@@ -36,10 +36,7 @@ async function start(fields) {
         sourceAccount: this.accountId,
         sourceAccountIdentifier: fields.login,
         fileIdAttributes: ['vendorRef'],
-        linkBankOperations: false,
-        matchingCriterias: {
-          labelRegex: '\\b(ddfip|drfip)\\b'
-        }
+        linkBankOperations: false
       })
     if (docs.length)
       await saveFiles(docs, fields.folderPath, {
