@@ -33,11 +33,13 @@ async function start(fields) {
     const { docs, bills } = await parseDocuments(files)
     if (bills.length)
       await saveBills(bills, fields, {
-        identifiers: ['ddfip', 'drfip'],
         sourceAccount: this.accountId,
         sourceAccountIdentifier: fields.login,
         fileIdAttributes: ['vendorRef'],
-        linkBankOperations: false
+        linkBankOperations: false,
+        matchingCriterias: {
+          labelRegex: '\\b(ddfip|drfip)\\b'
+        }
       })
     if (docs.length)
       await saveFiles(docs, fields.folderPath, {
