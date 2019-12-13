@@ -92,6 +92,6 @@
       }
     }
   },
-  "banksTransactionRegExp": "\\b(ddfip|drfip)\\b",
+  "banksTransactionRegExp": "\\bdrfip\\b",
   "manifest_version": "2"
 }
