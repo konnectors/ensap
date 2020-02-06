@@ -3,7 +3,6 @@ node_js:
 - '12'
 env:
   global:
-  - DEPLOY_REPOSITORY="git@github.com:konnectors/ensap.git"
   # REGISTRY_TOKEN(editor=cozy, app=ensap)
   - secure: Dx9eQ2al6ni+DhxsGd230QHi/Du+szUsJAeZcvFyRnkxQJ/voXVbstjF4UHuQpvtPr55rpE7c4w2Ur3XHM6nlKIAWWww+wvmxa9BsBk7oSE86lcs5297xOThSNHw2xiei2O8cCZQ3iOrLB+zt+veegOXp/3WZcK8U9awZUhnsRdyMuTOFsIqj3jarS8jnqr1OSp7OeEvWk2ivygWCKuEtlx19H6BaQ2L1CdIp3YSnIkrjxkUIIYnrLnobHemXWCXBYdBlJ9wTQcAFZjxB0a7UnFM+OBKhXcdBHkirmWcHTKk8tMiFJGyJLYbmIyzaU1JJcftt8Ki6Hd1aIDyzCW7PqgMTq77WSig1Q2SxsYkIq8yz5a9+JCCkVaiR14AIeCBZPch2EKX7BYtrzUdB+YdI0fl0DQ+thc4Moljbuagb9HGAIj7tW86ssSmGhHUy0tIT26yfx02/diaVPgsPYglald4q2lCRrpjnOjZZGFxhI8hRnIuUSBDegkYs2i+vrQTXCljEp1Qi5CVm5na40NhRTyXhzaOjSsJ/1m3hpcb+SYmEfZQYhnH21EoOuQI9EmvQcBPxFRM2IYrF+aBZytTS1//Z2SONGOAinh3ADIzPksqT9KzKFXNJ4yblrkPWGRcQroZ20rI4XmRlrZv03HL9c+YesBk51zPA8niBKZ9cIE=
   # MATTERMOST_HOOK_URL
