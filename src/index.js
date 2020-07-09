@@ -5,8 +5,6 @@ process.env.SENTRY_DSN =
 const {
   BaseKonnector,
   requestFactory,
-  saveBills,
-  saveFiles,
   log,
   errors
 } = require('cozy-konnector-libs')
@@ -16,6 +14,7 @@ const request = requestFactory({
   json: false,
   jar: true
 })
+const crypto = require('crypto')
 
 const VENDOR = 'Ensap'
 const baseUrl = 'https://ensap.gouv.fr'
@@ -23,26 +22,21 @@ const baseUrl = 'https://ensap.gouv.fr'
 module.exports = new BaseKonnector(start)
 
 async function start(fields) {
-  log('info', 'Authenticating ...')
-
-  log('info', 'Successfully logged in')
+  await this.deactivateAutoSuccessfulLogin()
   await authenticate(fields.login, fields.password)
+  await this.notifySuccessfulLogin()
   const years = await getYears()
   for (const year of years) {
     const files = await fetchFiles(year)
     const { docs, bills } = await parseDocuments(files)
     if (bills.length)
-      await saveBills(bills, fields, {
-        sourceAccount: this.accountId,
-        sourceAccountIdentifier: fields.login,
+      await this.saveBills(bills, fields, {
         fileIdAttributes: ['vendorRef'],
         linkBankOperations: false
       })
     if (docs.length)
-      await saveFiles(docs, fields.folderPath, {
+      await this.saveFiles(docs, fields, {
         contentType: 'application/pdf',
-        sourceAccount: this.accountId,
-        sourceAccountIdentifier: fields.login,
         fileIdAttributes: ['vendorRef']
       })
   }
@@ -100,6 +94,15 @@ async function parseDocuments(files) {
     let filename = file.nomDocument.replace(/_AF_/, '_Attestation_fiscale_')
     filename = filename.replace(/_BP_/, '_Bulletin_de_paie_')
     filename = filename.replace(/_DR_/, '_Décompte_de_rappel_')
+    filename = filename.replace(
+      /\.pdf$/,
+      `_${crypto
+        .createHash('sha1')
+        .update(uuid)
+        .digest('hex')
+        .substr(0, 5)}.pdf`
+    )
+
     // Date is set to 22 of the month for easier matching, if not BP is always at 1st
     let datePlus21 = new Date(file.dateDocument)
     datePlus21.setDate(datePlus21.getDate() + 21)
