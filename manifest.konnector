@@ -92,6 +92,10 @@
       }
     }
   },
+  "features": [
+    "LOGIN_OK",
+    "METADATA_DEDUP"
+  ],
   "banksTransactionRegExp": "\\b(ddfip|drfip).*(paye|remuneration\\b",
   "manifest_version": "2"
 }
