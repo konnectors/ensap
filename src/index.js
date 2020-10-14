@@ -136,6 +136,7 @@ async function parseDocuments(files, type = 'paie') {
     // Try to replace _XX_ known type_
     filename.replace(/_AF_/, '_Attestation_fiscale_')
     filename.replace(/_AFENS_/, '_Attestation_fiscale_')
+    filename.replace(/_AFPENS_/, '_Attestation_fiscale_')
     filename = filename.replace(/_DR_/, '_Décompte_de_rappel_')
     if (type === 'pension') {
       filename = filename.replace(/_BP_/, '_Bulletin_de_pension_')
