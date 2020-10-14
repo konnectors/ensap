@@ -39,7 +39,7 @@ async function start(fields) {
       if (docs.length)
         await this.saveFiles(docs, fields, {
           contentType: 'application/pdf',
-        fileIdAttributes: ['vendorRef']
+          fileIdAttributes: ['vendorRef']
         })
     }
   }
@@ -56,30 +56,32 @@ async function start(fields) {
       if (docs.length)
         await this.saveFiles(docs, fields, {
           contentType: 'application/pdf',
-        fileIdAttributes: ['vendorRef']
+          fileIdAttributes: ['vendorRef']
         })
     }
   }
 }
 
 async function getYears() {
-  const  resp  = await request.get(
-    `${baseUrl}/prive/accueilconnecte/v1`,
-    {
-      json: true
-    }
-  )
+  const resp = await request.get(`${baseUrl}/prive/accueilconnecte/v1`, {
+    json: true
+  })
   let listeAnneeRemunerationPension = resp.listeAnneeRemunerationPension
   let listeAnneeRemuneration = resp.listeAnneeRemuneration
   if (listeAnneeRemuneration && listeAnneeRemuneration.reverse) {
     listeAnneeRemuneration = listeAnneeRemuneration.sort().reverse()
   }
   if (listeAnneeRemunerationPension && listeAnneeRemunerationPension.reverse) {
-    listeAnneeRemunerationPension = listeAnneeRemunerationPension.sort().reverse()
+    listeAnneeRemunerationPension = listeAnneeRemunerationPension
+      .sort()
+      .reverse()
   }
 
   if (listeAnneeRemuneration || listeAnneeRemunerationPension) {
-    return { yearsPaie: listeAnneeRemuneration, yearsPension: listeAnneeRemunerationPension }
+    return {
+      yearsPaie: listeAnneeRemuneration,
+      yearsPension: listeAnneeRemunerationPension
+    }
   } else {
     log('warn', 'could not find year of remuneration')
     return {}
@@ -119,7 +121,7 @@ function fetchFilesPension(year) {
   })
 }
 
-async function parseDocuments(files, type='paie') {
+async function parseDocuments(files, type = 'paie') {
   const docs = []
   const bills = []
   for (const file of files) {
@@ -158,8 +160,11 @@ async function parseDocuments(files, type='paie') {
     const vendor = VENDOR
 
     // This doc have no amount in libelle3, make a file only.
-    if (file.icone === 'rappel' || file.icone === 'attestation'
-        || file.icone === 'attestation-pension') {
+    if (
+      file.icone === 'rappel' ||
+      file.icone === 'attestation' ||
+      file.icone === 'attestation-pension'
+    ) {
       const doc = {
         fileurl,
         filename,
