@@ -25,35 +25,66 @@ async function start(fields) {
   await this.deactivateAutoSuccessfulLogin()
   await authenticate(fields.login, fields.password)
   await this.notifySuccessfulLogin()
-  const years = await getYears()
-  for (const year of years) {
-    const files = await fetchFiles(year)
-    const { docs, bills } = await parseDocuments(files)
-    if (bills.length)
-      await this.saveBills(bills, fields, {
-        fileIdAttributes: ['vendorRef'],
-        linkBankOperations: false
-      })
-    if (docs.length)
-      await this.saveFiles(docs, fields, {
-        contentType: 'application/pdf',
-        fileIdAttributes: ['vendorRef']
-      })
+  const { yearsPaie, yearsPension } = await getYears()
+  if (yearsPaie) {
+    log('info', 'Found Remuneration type docs, fetching them...')
+    for (const yearPaie of yearsPaie) {
+      const files = await fetchFiles(yearPaie)
+      const { docs, bills } = await parseDocuments(files, 'paie')
+      if (bills.length)
+        await this.saveBills(bills, fields, {
+          fileIdAttributes: ['vendorRef'],
+          linkBankOperations: false
+        })
+      if (docs.length)
+        await this.saveFiles(docs, fields, {
+          contentType: 'application/pdf',
+          fileIdAttributes: ['vendorRef']
+        })
+    }
+  }
+  if (yearsPension) {
+    log('info', 'Found Pension type docs, fetching them...')
+    for (const yearPension of yearsPension) {
+      const files = await fetchFilesPension(yearPension)
+      const { docs, bills } = await parseDocuments(files, 'pension')
+      if (bills.length)
+        await this.saveBills(bills, fields, {
+          fileIdAttributes: ['vendorRef'],
+          linkBankOperations: false
+        })
+      if (docs.length)
+        await this.saveFiles(docs, fields, {
+          contentType: 'application/pdf',
+          fileIdAttributes: ['vendorRef']
+        })
+    }
   }
 }
 
 async function getYears() {
-  const { listeAnneeRemuneration } = await request.get(
-    `${baseUrl}/prive/accueilconnecte/v1`,
-    {
-      json: true
-    }
-  )
+  const resp = await request.get(`${baseUrl}/prive/accueilconnecte/v1`, {
+    json: true
+  })
+  let listeAnneeRemunerationPension = resp.listeAnneeRemunerationPension
+  let listeAnneeRemuneration = resp.listeAnneeRemuneration
   if (listeAnneeRemuneration && listeAnneeRemuneration.reverse) {
-    return listeAnneeRemuneration.sort().reverse()
+    listeAnneeRemuneration = listeAnneeRemuneration.sort().reverse()
+  }
+  if (listeAnneeRemunerationPension && listeAnneeRemunerationPension.reverse) {
+    listeAnneeRemunerationPension = listeAnneeRemunerationPension
+      .sort()
+      .reverse()
+  }
+
+  if (listeAnneeRemuneration || listeAnneeRemunerationPension) {
+    return {
+      yearsPaie: listeAnneeRemuneration,
+      yearsPension: listeAnneeRemunerationPension
+    }
   } else {
     log('warn', 'could not find year of remuneration')
-    return []
+    return {}
   }
 }
 
@@ -77,23 +108,43 @@ async function authenticate(username, password) {
 }
 
 function fetchFiles(year) {
-  log('info', `Fetching files for year ${year}`)
+  log('info', `Fetching files paie for year ${year}`)
   return request.get(`${baseUrl}/prive/remunerationpaie/v1?annee=${year}`, {
     json: true
   })
 }
 
-async function parseDocuments(files) {
+function fetchFilesPension(year) {
+  log('info', `Fetching files pension for year ${year}`)
+  return request.get(`${baseUrl}/prive/remunerationpension/v1?annee=${year}`, {
+    json: true
+  })
+}
+
+async function parseDocuments(files, type = 'paie') {
   const docs = []
   const bills = []
   for (const file of files) {
     // For each file get the pdf url and metadata
     const uuid = file.documentUuid
-    const fileurl = `${baseUrl}/prive/telechargerremunerationpaie/v1?documentUuid=${uuid}`
+    // Switching url if we have pension documents
+    let fileurl = `${baseUrl}/prive/telechargerremunerationpaie/v1?documentUuid=${uuid}`
+    if (type === 'pension') {
+      fileurl = `${baseUrl}/prive/telechargerremunerationpension/v1?documentUuid=${uuid}`
+    }
+    let filename = file.nomDocument
     // Try to replace _XX_ known type_
-    let filename = file.nomDocument.replace(/_AF_/, '_Attestation_fiscale_')
-    filename = filename.replace(/_BP_/, '_Bulletin_de_paie_')
+    filename.replace(/_AF_/, '_Attestation_fiscale_')
+    filename.replace(/_AFENS_/, '_Attestation_fiscale_')
+    filename.replace(/_AFPENS_/, '_Attestation_fiscale_')
     filename = filename.replace(/_DR_/, '_Décompte_de_rappel_')
+    if (type === 'pension') {
+      filename = filename.replace(/_BP_/, '_Bulletin_de_pension_')
+      filename = filename.replace(/_BPENS_/, '_Bulletin_de_pension_')
+    } else {
+      filename = filename.replace(/_BP_/, '_Bulletin_de_paie_')
+      filename = filename.replace(/_BPENS_/, '_Bulletin_de_paie_')
+    }
     filename = filename.replace(
       /\.pdf$/,
       `_${crypto
@@ -110,14 +161,18 @@ async function parseDocuments(files) {
     const vendor = VENDOR
 
     // This doc have no amount in libelle3, make a file only.
-    if (file.icone === 'rappel' || file.icone === 'attestation') {
+    if (
+      file.icone === 'rappel' ||
+      file.icone === 'attestation' ||
+      file.icone === 'attestation-pension'
+    ) {
       const doc = {
         fileurl,
         filename,
         vendorRef: uuid
       }
       docs.push(doc)
-    } else if (file.icone === 'document') {
+    } else if (file.icone === 'document' || file.icone === 'document-pension') {
       // This doc have amount, it's a bill !
       const doc = {
         date: datePlus21,
