@@ -174,7 +174,12 @@ async function parseDocuments(files, type = 'paie') {
       const doc = {
         fileurl,
         filename,
-        vendorRef: uuid
+        vendorRef: uuid,
+        fileAttributes: {
+          metadata: {
+            carbonCopy: true
+          }
+        }
       }
       docs.push(doc)
     } else if (file.icone === 'document' || file.icone === 'document-pension') {
@@ -187,7 +192,12 @@ async function parseDocuments(files, type = 'paie') {
         isRefund: true,
         vendor,
         vendorRef: uuid,
-        type: 'income'
+        type: 'income',
+        fileAttributes: {
+          metadata: {
+            carbonCopy: true
+          }
+        }
       }
       bills.push(doc)
     } else {
