@@ -8,13 +8,12 @@ const {
   log,
   errors
 } = require('cozy-konnector-libs')
-const DEBUG = false
+
 const request = requestFactory({
-  debug: DEBUG,
-  json: false,
+  debug: true,
+  json: true,
   jar: true
 })
-const crypto = require('crypto')
 
 const VENDOR = 'Ensap'
 const baseUrl = 'https://ensap.gouv.fr'
@@ -23,82 +22,96 @@ module.exports = new BaseKonnector(start)
 
 async function start(fields) {
   await this.deactivateAutoSuccessfulLogin()
-  await authenticate(fields.login, fields.password)
+  await authenticate(fields.identifiant, fields.secret)
   await this.notifySuccessfulLogin()
-  const { yearsPaie, yearsPension } = await getYears()
-  if (yearsPaie) {
-    log('info', 'Found Remuneration type docs, fetching them...')
-    for (const yearPaie of yearsPaie) {
-      const files = await fetchFiles(yearPaie)
-      const { docs, bills } = await parseDocuments(files, 'paie')
-      if (bills.length)
-        await this.saveBills(bills, fields, {
-          fileIdAttributes: ['vendorRef'],
-          linkBankOperations: false
-        })
-      if (docs.length)
-        await this.saveFiles(docs, fields, {
-          contentType: 'application/pdf',
-          fileIdAttributes: ['vendorRef']
-        })
-    }
-  }
-  if (yearsPension) {
-    log('info', 'Found Pension type docs, fetching them...')
-    for (const yearPension of yearsPension) {
-      const files = await fetchFilesPension(yearPension)
-      const { docs, bills } = await parseDocuments(files, 'pension')
-      if (bills.length)
-        await this.saveBills(bills, fields, {
-          fileIdAttributes: ['vendorRef'],
-          linkBankOperations: false
-        })
-      if (docs.length)
-        await this.saveFiles(docs, fields, {
-          contentType: 'application/pdf',
-          fileIdAttributes: ['vendorRef']
-        })
+
+  const documents = await getDocs()
+
+  for (const doc of documents) {
+    let oneFile = []
+
+    await request({
+      uri: `${baseUrl}/prive/initialiserhabilitation/v1`,
+      method: 'POST',
+      body: {},
+      resolveWithFullResponse: true
+    })
+    let resp = await request({
+      uri: `${baseUrl}/prive/accueilconnecte/v1`,
+      resolveWithFullResponse: true
+    })
+    await request({
+      uri: `${baseUrl}/prive/verifiersession/v1`,
+      method: 'POST',
+      headers: {},
+      body: {},
+      resolveWithFullResponse: true
+    })
+
+    let neededCookies = resp.headers['set-cookie']
+    let test = neededCookies[0]
+
+    let cookieSplit = test.split('; ')
+    let cookieObject = {}
+    cookieSplit.forEach(function(value) {
+      let splitResult = value.split('=')
+      cookieObject[splitResult[0]] = splitResult[1]
+    })
+
+    let stringedAmount = doc.libelle3.replace(',', '.')
+
+    oneFile.push({
+      ...doc,
+      date: new Date('January 12, 2022'),
+      vendor: VENDOR,
+      vendorRef: doc.evenementId,
+      amount: parseFloat(stringedAmount),
+      fileurl: `${baseUrl}/prive/telechargerremunerationpaie/v1?documentUuid=${doc.documentUuid}`,
+      filename: `${doc.libelle1.toLowerCase().replace(/ /g, '_')}.pdf`,
+      requestOptions: {
+        headers: {
+          'X-XSRF-TOKEN': `${cookieObject['XSRF-TOKEN']}`
+        },
+        cookie: {
+          neededCookies
+        }
+      },
+      fileAttributes: {
+        metadata: {
+          issueDate: '',
+          datetimeLabel: 'issueDate',
+          contentAuthor: 'ensap.gouv.fr'
+        }
+      }
+    })
+    log('info', oneFile)
+    if (doc.service === 'remuneration') {
+      await this.saveBills(oneFile, fields, {
+        fileIdAttributes: ['vendorRef'],
+        linkBankOperations: false,
+        identifiers: ['Ensap'],
+        sourceAccountIdentifier: fields.identifiant
+      })
     }
   }
 }
-
-async function getYears() {
-  const resp = await request.get(`${baseUrl}/prive/accueilconnecte/v1`, {
-    json: true
-  })
-  let listeAnneeRemunerationPension = resp.listeAnneeRemunerationPension
-  let listeAnneeRemuneration = resp.listeAnneeRemuneration
-  if (listeAnneeRemuneration && listeAnneeRemuneration.reverse) {
-    listeAnneeRemuneration = listeAnneeRemuneration.sort().reverse()
-  }
-  if (listeAnneeRemunerationPension && listeAnneeRemunerationPension.reverse) {
-    listeAnneeRemunerationPension = listeAnneeRemunerationPension
-      .sort()
-      .reverse()
-  }
-
-  if (listeAnneeRemuneration || listeAnneeRemunerationPension) {
-    return {
-      yearsPaie: listeAnneeRemuneration,
-      yearsPension: listeAnneeRemunerationPension
-    }
-  } else {
-    log('warn', 'could not find year of remuneration')
-    return {}
-  }
-}
-
 async function authenticate(username, password) {
-  const resp = await request({
-    uri: `${baseUrl}/authentification`,
+  let resp = await request({
+    uri: `${baseUrl}/`,
     method: 'POST',
-    formData: { identifiant: username, secret: password }
+    Headers: { 'Content-Type': 'application/json' },
+    formData: { identifiant: username, secret: password },
+    resolveWithFullResponse: true
   })
-  if (resp.includes('Identifiant ou mot de passe erroné')) {
+  resp = resp.body
+
+  if (resp.message.includes('Identifiant ou mot de passe erroné')) {
     throw new Error(errors.LOGIN_FAILED)
-  } else if (resp.includes('Authentification OK')) {
+  } else if (resp.message.includes('Authentification OK')) {
     return
-  } else if (resp.includes('Ce compte est temporairement bloqué pendant')) {
+  } else if (
+    resp.message.includes('Ce compte est temporairement bloqué pendant')
+  ) {
     log('error', resp)
     throw new Error('LOGIN_FAILED.TOO_MANY_ATTEMPTS')
   } else {
@@ -107,90 +120,26 @@ async function authenticate(username, password) {
   }
 }
 
-function fetchFiles(year) {
-  log('info', `Fetching files paie for year ${year}`)
-  return request.get(`${baseUrl}/prive/remunerationpaie/v1?annee=${year}`, {
-    json: true
+async function getDocs() {
+  await request({
+    uri: `${baseUrl}/prive/initialiserhabilitation/v1`,
+    method: 'POST',
+    body: {},
+    resolveWithFullResponse: true
   })
-}
-
-function fetchFilesPension(year) {
-  log('info', `Fetching files pension for year ${year}`)
-  return request.get(`${baseUrl}/prive/remunerationpension/v1?annee=${year}`, {
-    json: true
+  let resp = await request({
+    uri: `${baseUrl}/prive/accueilconnecte/v1`,
+    resolveWithFullResponse: true
   })
-}
 
-async function parseDocuments(files, type = 'paie') {
-  const docs = []
-  const bills = []
-  for (const file of files) {
-    // For each file get the pdf url and metadata
-    const uuid = file.documentUuid
-    // Switching url if we have pension documents
-    let fileurl = `${baseUrl}/prive/telechargerremunerationpaie/v1?documentUuid=${uuid}`
-    if (type === 'pension') {
-      fileurl = `${baseUrl}/prive/telechargerremunerationpension/v1?documentUuid=${uuid}`
-    }
-    let filename = file.nomDocument
-    // Try to replace _XX_ known type_
-    filename = filename.replace(/_AF_/, '_Attestation_fiscale_')
-    filename = filename.replace(/_AFENS_/, '_Attestation_fiscale_')
-    filename = filename.replace(/_AFPENS_/, '_Attestation_fiscale_')
-    filename = filename.replace(/_DR_/, '_Décompte_de_rappel_')
-    if (type === 'pension') {
-      filename = filename.replace(/_BP_/, '_Bulletin_de_pension_')
-      filename = filename.replace(/_BPENS_/, '_Bulletin_de_pension_')
-    } else {
-      filename = filename.replace(/_BP_/, '_Bulletin_de_paie_')
-      filename = filename.replace(/_BPENS_/, '_Bulletin_de_paie_')
-    }
-    filename = filename.replace(
-      /\.pdf$/,
-      `_${crypto
-        .createHash('sha1')
-        .update(uuid)
-        .digest('hex')
-        .substr(0, 5)}.pdf`
-    )
+  let neededCookies = resp.headers['set-cookie']
+  log('info', neededCookies[0])
 
-    // Date is set to 22 of the month for easier matching, if not BP is always at 1st
-    let datePlus21 = new Date(file.dateDocument)
-    datePlus21.setDate(datePlus21.getDate() + 21)
-    const amount = parseFloat(file.libelle3.replace(' ', '').replace(',', '.'))
-    const vendor = VENDOR
-
-    // This doc have no amount in libelle3, make a file only.
-    if (
-      file.icone === 'rappel' ||
-      file.icone === 'attestation' ||
-      file.icone === 'attestation-pension'
-    ) {
-      const doc = {
-        fileurl,
-        filename,
-        vendorRef: uuid
-      }
-      docs.push(doc)
-    } else if (file.icone === 'document' || file.icone === 'document-pension') {
-      // This doc have amount, it's a bill !
-      const doc = {
-        date: datePlus21,
-        fileurl,
-        filename,
-        amount,
-        isRefund: true,
-        vendor,
-        vendorRef: uuid,
-        type: 'income'
-      }
-      bills.push(doc)
-    } else {
-      log(
-        'warn',
-        `Unkown type for one doc, discarding this one : ${file.icone}`
-      )
-    }
+  let downloadDocs = []
+  for (const evenement of resp.body.donnee.listeEvenement) {
+    downloadDocs.push({
+      ...evenement
+    })
   }
-  return { docs, bills }
+  return downloadDocs
 }
