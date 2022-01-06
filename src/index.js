@@ -20,6 +20,8 @@ const request = requestFactory({
   jar: true
 })
 
+const crypto = require('crypto')
+
 const VENDOR = 'Ensap'
 const baseUrl = 'https://ensap.gouv.fr'
 
@@ -64,20 +66,35 @@ async function start(fields) {
     })
 
     let stringedAmount = doc.libelle3.replace(',', '.')
+    const uuid = doc.documentUuid
     const splitDate = doc.dateEvenement.split('/')
     const formatDay = splitDate[0]
     const formatMonth = splitDate[1]
     const formatYear = splitDate[2]
     doc.dateEvenement = `${formatYear}-${formatMonth}-${formatDay}`
+    const trimedTitle = doc.libelle1
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[0-9]/g, '')
+      .replace(/ /g, '_')
+    const formatFilename = `${formatYear}_${formatMonth}_${trimedTitle}.pdf`
+    const filename = formatFilename.replace(
+      /\.pdf$/,
+      `${crypto
+        .createHash('sha1')
+        .update(uuid)
+        .digest('hex')
+        .substr(0, 5)}.pdf`
+    )
 
     oneFile.push({
       ...doc,
       date: new Date(doc.dateEvenement),
       vendor: VENDOR,
-      vendorRef: doc.evenementId,
+      vendorRef: uuid,
       amount: parseFloat(stringedAmount),
       fileurl: `${baseUrl}/prive/telechargerremunerationpaie/v1?documentUuid=${doc.documentUuid}`,
-      filename: `${doc.libelle1.toLowerCase().replace(/ /g, '_')}.pdf`,
+      filename: filename,
       requestOptions: {
         headers: {
           'X-XSRF-TOKEN': `${cookieObject['XSRF-TOKEN']}`
