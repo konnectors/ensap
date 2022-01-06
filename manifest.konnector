@@ -1,0 +1,113 @@
+{
+  "version": "1.5.0",
+  "name": "Ensap",
+  "type": "konnector",
+  "language": "node",
+  "icon": "icon.svg",
+  "slug": "ensap",
+  "source": "git://github.com/konnectors/ensap.git",
+  "editor": "Cozy",
+  "vendor_link": "https://ensap.gouv.fr",
+  "categories": [
+    "public_service"
+  ],
+  "fields": {
+    "login": {
+      "type": "text"
+    },
+    "password": {
+      "type": "password"
+    },
+    "advancedFields": {
+      "folderPath": {
+        "advanced": true,
+        "isRequired": false
+      }
+    }
+  },
+  "data_types": [
+    "bill"
+  ],
+  "screenshots": [],
+  "permissions": {
+    "carbon_copy": {
+      "type": "io.cozy.certified.carbon_copy"
+    },
+    "bank operations": {
+      "type": "io.cozy.bank.operations"
+    },
+    "bills": {
+      "type": "io.cozy.bills"
+    },
+    "files": {
+      "type": "io.cozy.files"
+    },
+    "accounts": {
+      "type": "io.cozy.accounts"
+    }
+  },
+  "developer": {
+    "name": "Cozy Cloud",
+    "url": "https://cozy.io"
+  },
+  "langs": [
+    "fr",
+    "en"
+  ],
+  "locales": {
+    "fr": {
+      "short_description": "Récupère vos bulletins de paie et vos bulletins de pension",
+      "long_description": "Récupère sur le service de l'ENSAP :\n- Vos bulletins de paie\n- Vos bulletins de pension\n- Vos attestations fiscales\n- Vos décomptes de rappel",
+      "permissions": {
+        "carboncopy": {
+          "description": "Utilisé pour certifier que vos fichiers sont copie conforme avec les documents d'origine"
+        },
+        "bank operations": {
+          "description": "Utilisé pour relier les factures à des operations bancaires"
+        },
+        "bills": {
+          "description": "Utilisé pour sauver les données des factures"
+        },
+        "files": {
+          "description": "Utilisé pour sauvegarder les factures"
+        },
+        "accounts": {
+          "description": "Utilisé pour obtenir les données du compte"
+        }
+      }
+    },
+    "en": {
+      "short_description": "Fetch your pay and pension slips",
+      "long_description": "Fetch on the ENSAP website:\n- Your pay slips\n- Your pension slips\n- Your tax certificates\n- Your 'décomptes de rappel'",
+      "permissions": {
+        "carboncopy": {
+          "description": "Use to certify your files are the exact copy of the originals"
+        },
+        "bank operations": {
+          "description": "Required to link bank operations to bills"
+        },
+        "bills": {
+          "description": "Required to save the bills data"
+        },
+        "files": {
+          "description": "Required to save the bills"
+        },
+        "accounts": {
+          "description": "Required to get the account's data"
+        }
+      }
+    }
+  },
+  "qualification_labels":[
+    "pay_sheet"
+  ],
+  "features": [
+    "LOGIN_OK",
+    "METADATA_DEDUP",
+    "CARBON_COPY",
+    "DOC_QUALIFICATION_V2",
+    "SENTRY_V2"
+  ],
+  "banksTransactionRegExp": "\\b(ddfip|drfip).*(paye|remuneration\\b",
+  "manifest_version": "2"
+}
