@@ -1,16 +1,21 @@
 process.env.SENTRY_DSN =
   process.env.SENTRY_DSN ||
-  'https://ea724fef74ee48889c9a788643f96a48@sentry.cozycloud.cc/123'
+  'https://783765ad8f0542ce9d961b2ef487cd57@errors.cozycloud.cc/20'
 
 const {
   BaseKonnector,
   requestFactory,
   log,
-  errors
+  errors,
+  utils,
+  cozyClient
 } = require('cozy-konnector-libs')
 
+const models = cozyClient.new.models
+const { Qualification } = models.document
+
 const request = requestFactory({
-  debug: true,
+  debug: false,
   json: true,
   jar: true
 })
@@ -59,10 +64,15 @@ async function start(fields) {
     })
 
     let stringedAmount = doc.libelle3.replace(',', '.')
+    const splitDate = doc.dateEvenement.split('/')
+    const formatDay = splitDate[0]
+    const formatMonth = splitDate[1]
+    const formatYear = splitDate[2]
+    doc.dateEvenement = `${formatYear}-${formatMonth}-${formatDay}`
 
     oneFile.push({
       ...doc,
-      date: new Date('January 12, 2022'),
+      date: new Date(doc.dateEvenement),
       vendor: VENDOR,
       vendorRef: doc.evenementId,
       amount: parseFloat(stringedAmount),
@@ -71,22 +81,29 @@ async function start(fields) {
       requestOptions: {
         headers: {
           'X-XSRF-TOKEN': `${cookieObject['XSRF-TOKEN']}`
-        },
-        cookie: {
-          neededCookies
         }
       },
       fileAttributes: {
         metadata: {
-          issueDate: '',
+          datetime: utils.formatDate(new Date()),
           datetimeLabel: 'issueDate',
-          contentAuthor: 'ensap.gouv.fr'
+          contentAuthor: 'ensap.gouv.fr',
+          carbonCopy: true,
+          qualification: Qualification.getByLabel('pay_sheet')
         }
       }
     })
-    log('info', oneFile)
-    if (doc.service === 'remuneration') {
+    log('info', oneFile[0])
+    if (oneFile[0].service === 'remuneration') {
       await this.saveBills(oneFile, fields, {
+        fileIdAttributes: ['vendorRef'],
+        linkBankOperations: false,
+        identifiers: ['Ensap'],
+        sourceAccountIdentifier: fields.identifiant
+      })
+    } else {
+      log('info', 'is no bill')
+      await this.saveFiles(oneFile, fields, {
         fileIdAttributes: ['vendorRef'],
         linkBankOperations: false,
         identifiers: ['Ensap'],
@@ -131,9 +148,6 @@ async function getDocs() {
     uri: `${baseUrl}/prive/accueilconnecte/v1`,
     resolveWithFullResponse: true
   })
-
-  let neededCookies = resp.headers['set-cookie']
-  log('info', neededCookies[0])
 
   let downloadDocs = []
   for (const evenement of resp.body.donnee.listeEvenement) {
