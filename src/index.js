@@ -99,7 +99,7 @@ async function start(fields) {
         fileIdAttributes: ['vendorRef'],
         linkBankOperations: false,
         identifiers: ['Ensap'],
-        sourceAccountIdentifier: fields.identifiant
+        sourceAccountIdentifier: fields.username
       })
     } else {
       log('info', 'is no bill')
@@ -107,7 +107,7 @@ async function start(fields) {
         fileIdAttributes: ['vendorRef'],
         linkBankOperations: false,
         identifiers: ['Ensap'],
-        sourceAccountIdentifier: fields.identifiant
+        sourceAccountIdentifier: fields.username
       })
     }
   }
