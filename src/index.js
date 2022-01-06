@@ -27,7 +27,7 @@ module.exports = new BaseKonnector(start)
 
 async function start(fields) {
   await this.deactivateAutoSuccessfulLogin()
-  await authenticate(fields.identifiant, fields.secret)
+  await authenticate(fields.username, fields.password)
   await this.notifySuccessfulLogin()
 
   const documents = await getDocs()
@@ -113,26 +113,34 @@ async function start(fields) {
   }
 }
 async function authenticate(username, password) {
-  let resp = await request({
+  const resp = await request({
     uri: `${baseUrl}/`,
     method: 'POST',
     Headers: { 'Content-Type': 'application/json' },
     formData: { identifiant: username, secret: password },
     resolveWithFullResponse: true
   })
-  resp = resp.body
 
-  if (resp.message.includes('Identifiant ou mot de passe erroné')) {
+  const respBody = resp.body
+
+  if (
+    respBody.message.includes('Identifiant ou mot de passe erroné') &&
+    resp.statusCode != 200
+  ) {
     throw new Error(errors.LOGIN_FAILED)
-  } else if (resp.message.includes('Authentification OK')) {
+  } else if (
+    respBody.message.includes('Authentification OK') &&
+    resp.statusCode === 200
+  ) {
     return
   } else if (
-    resp.message.includes('Ce compte est temporairement bloqué pendant')
+    respBody.message.includes('Ce compte est temporairement bloqué pendant') &&
+    resp.statusCode != 200
   ) {
-    log('error', resp)
+    log('error', respBody)
     throw new Error('LOGIN_FAILED.TOO_MANY_ATTEMPTS')
   } else {
-    log('error', resp)
+    log('error', respBody)
     throw new Error(errors.VENDOR_DOWN)
   }
 }
@@ -144,13 +152,12 @@ async function getDocs() {
     body: {},
     resolveWithFullResponse: true
   })
-  let resp = await request({
-    uri: `${baseUrl}/prive/accueilconnecte/v1`,
-    resolveWithFullResponse: true
+  const resp = await request({
+    uri: `${baseUrl}/prive/accueilconnecte/v1`
   })
 
   let downloadDocs = []
-  for (const evenement of resp.body.donnee.listeEvenement) {
+  for (const evenement of resp.donnee.listeEvenement) {
     downloadDocs.push({
       ...evenement
     })
