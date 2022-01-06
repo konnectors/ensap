@@ -27,7 +27,7 @@ module.exports = new BaseKonnector(start)
 
 async function start(fields) {
   await this.deactivateAutoSuccessfulLogin()
-  await authenticate(fields.username, fields.password)
+  await authenticate(fields.login, fields.password)
   await this.notifySuccessfulLogin()
 
   const documents = await getDocs()
@@ -99,7 +99,7 @@ async function start(fields) {
         fileIdAttributes: ['vendorRef'],
         linkBankOperations: false,
         identifiers: ['Ensap'],
-        sourceAccountIdentifier: fields.username
+        sourceAccountIdentifier: fields.login
       })
     } else {
       log('info', 'is no bill')
@@ -107,17 +107,17 @@ async function start(fields) {
         fileIdAttributes: ['vendorRef'],
         linkBankOperations: false,
         identifiers: ['Ensap'],
-        sourceAccountIdentifier: fields.username
+        sourceAccountIdentifier: fields.login
       })
     }
   }
 }
-async function authenticate(username, password) {
+async function authenticate(login, password) {
   const resp = await request({
     uri: `${baseUrl}/`,
     method: 'POST',
     Headers: { 'Content-Type': 'application/json' },
-    formData: { identifiant: username, secret: password },
+    formData: { identifiant: login, secret: password },
     resolveWithFullResponse: true
   })
 
