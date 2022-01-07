@@ -30,6 +30,9 @@
   ],
   "screenshots": [],
   "permissions": {
+    "carbon_copy": {
+      "type": "io.cozy.certified.carbon_copy"
+    },
     "bank operations": {
       "type": "io.cozy.bank.operations"
     },
@@ -56,6 +59,9 @@
       "short_description": "Récupère vos bulletins de paie et vos bulletins de pension",
       "long_description": "Récupère sur le service de l'ENSAP :\n- Vos bulletins de paie\n- Vos bulletins de pension\n- Vos attestations fiscales\n- Vos décomptes de rappel",
       "permissions": {
+        "carboncopy": {
+          "description": "Utilisé pour certifier que vos fichiers sont copie conforme avec les documents d'origine"
+        },
         "bank operations": {
           "description": "Utilisé pour relier les factures à des operations bancaires"
         },
@@ -74,6 +80,9 @@
       "short_description": "Fetch your pay and pension slips",
       "long_description": "Fetch on the ENSAP website:\n- Your pay slips\n- Your pension slips\n- Your tax certificates\n- Your 'décomptes de rappel'",
       "permissions": {
+        "carboncopy": {
+          "description": "Use to certify your files are the exact copy of the originals"
+        },
         "bank operations": {
           "description": "Required to link bank operations to bills"
         },
@@ -89,9 +98,15 @@
       }
     }
   },
+  "qualification_labels":[
+    "pay_sheet"
+  ],
   "features": [
     "LOGIN_OK",
-    "METADATA_DEDUP"
+    "METADATA_DEDUP",
+    "CARBON_COPY",
+    "DOC_QUALIFICATION_V2",
+    "SENTRY_V2"
   ],
   "banksTransactionRegExp": "\\b(ddfip|drfip).*(paye|remuneration\\b",
   "manifest_version": "2"
