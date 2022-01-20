@@ -30,11 +30,11 @@
   ],
   "screenshots": [],
   "permissions": {
-    "carbon_copy": {
-      "type": "io.cozy.certified.carbon_copy"
-    },
     "bank operations": {
       "type": "io.cozy.bank.operations"
+    },
+    "carbon_copy": {
+      "type": "io.cozy.certified.carbon_copy"
     },
     "bills": {
       "type": "io.cozy.bills"
@@ -99,7 +99,8 @@
     }
   },
   "qualification_labels": [
-    "pay_sheet"
+    "pay_sheet",
+    "other_revenue"
   ],
   "features": [
     "LOGIN_OK",
