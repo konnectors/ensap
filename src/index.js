@@ -32,100 +32,42 @@ async function start(fields) {
   await authenticate(fields.login, fields.password)
   await this.notifySuccessfulLogin()
 
-  const documents = await getDocs()
-
-  for (const doc of documents) {
-    let oneFile = []
-
-    await request({
-      uri: `${baseUrl}/prive/initialiserhabilitation/v1`,
-      method: 'POST',
-      body: {},
-      resolveWithFullResponse: true
-    })
-    let resp = await request({
-      uri: `${baseUrl}/prive/accueilconnecte/v1`,
-      resolveWithFullResponse: true
-    })
-    await request({
-      uri: `${baseUrl}/prive/verifiersession/v1`,
-      method: 'POST',
-      headers: {},
-      body: {},
-      resolveWithFullResponse: true
-    })
-
-    let neededCookies = resp.headers['set-cookie']
-    let test = neededCookies[0]
-
-    let cookieSplit = test.split('; ')
-    let cookieObject = {}
-    cookieSplit.forEach(function(value) {
-      let splitResult = value.split('=')
-      cookieObject[splitResult[0]] = splitResult[1]
-    })
-
-    let stringedAmount = doc.libelle3.replace(',', '.')
-    const uuid = doc.documentUuid
-    const splitDate = doc.dateEvenement.split('/')
-    const formatDay = splitDate[0]
-    const formatMonth = splitDate[1]
-    const formatYear = splitDate[2]
-    doc.dateEvenement = `${formatYear}-${formatMonth}-${formatDay}`
-    const trimedTitle = doc.libelle1
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[0-9]/g, '')
-      .replace(/ /g, '_')
-    const formatFilename = `${formatYear}_${formatMonth}_${trimedTitle}.pdf`
-    const filename = formatFilename.replace(
-      /\.pdf$/,
-      `${crypto
-        .createHash('sha1')
-        .update(uuid)
-        .digest('hex')
-        .substr(0, 5)}.pdf`
-    )
-
-    oneFile.push({
-      ...doc,
-      date: new Date(doc.dateEvenement),
-      vendor: VENDOR,
-      vendorRef: uuid,
-      amount: parseFloat(stringedAmount),
-      fileurl: `${baseUrl}/prive/telechargerremunerationpaie/v1?documentUuid=${doc.documentUuid}`,
-      filename: filename,
-      requestOptions: {
-        headers: {
-          'X-XSRF-TOKEN': `${cookieObject['XSRF-TOKEN']}`
-        }
-      },
-      fileAttributes: {
-        metadata: {
-          datetime: utils.formatDate(new Date()),
-          datetimeLabel: 'issueDate',
-          contentAuthor: 'ensap.gouv.fr',
-          carbonCopy: true,
-          qualification: Qualification.getByLabel('pay_sheet')
-        }
-      }
-    })
-    log('info', oneFile[0])
-    if (oneFile[0].service === 'remuneration') {
-      await this.saveBills(oneFile, fields, {
-        fileIdAttributes: ['vendorRef'],
-        linkBankOperations: false,
-        identifiers: ['Ensap'],
-        sourceAccountIdentifier: fields.login
-      })
-    } else {
-      log('info', 'is no bill')
-      await this.saveFiles(oneFile, fields, {
-        fileIdAttributes: ['vendorRef'],
-        linkBankOperations: false,
-        identifiers: ['Ensap'],
-        sourceAccountIdentifier: fields.login
-      })
+  const { yearsPaie, yearsPension } = await getYears()
+  if (yearsPaie) {
+    log('info', 'Found Remuneration type docs, fetching them...')
+    for (const yearPaie of yearsPaie) {
+      const files = await fetchFiles(yearPaie)
+      const { docs, bills } = await parseDocuments(files, 'paie')
+      if (bills.length)
+        // We update the isRefund attribute if missing due to 1.5.0
+        await this.saveBills(bills, fields, {
+          fileIdAttributes: ['vendorRef'],
+          shouldUpdate: function(newBill, dbEntry) {
+            const result = newBill.isRefund && !dbEntry.isRefund
+            return result
+          }
+        })
+      if (docs.length)
+        await this.saveFiles(docs, fields, {
+          contentType: 'application/pdf',
+          fileIdAttributes: ['vendorRef']
+        })
+    }
+  }
+  if (yearsPension) {
+    log('info', 'Found Pension type docs, fetching them...')
+    for (const yearPension of yearsPension) {
+      const files = await fetchFilesPension(yearPension)
+      const { docs, bills } = await parseDocuments(files, 'pension')
+      if (bills.length)
+        await this.saveBills(bills, fields, {
+          fileIdAttributes: ['vendorRef']
+        })
+      if (docs.length)
+        await this.saveFiles(docs, fields, {
+          contentType: 'application/pdf',
+          fileIdAttributes: ['vendorRef']
+        })
     }
   }
 }
@@ -162,22 +104,137 @@ async function authenticate(login, password) {
   }
 }
 
-async function getDocs() {
-  await request({
+async function getYears() {
+  const resp = await request({
     uri: `${baseUrl}/prive/initialiserhabilitation/v1`,
     method: 'POST',
     body: {},
     resolveWithFullResponse: true
   })
-  const resp = await request({
-    uri: `${baseUrl}/prive/accueilconnecte/v1`
-  })
-
-  let downloadDocs = []
-  for (const evenement of resp.donnee.listeEvenement) {
-    downloadDocs.push({
-      ...evenement
-    })
+  let listeAnneeRemunerationPension = resp.body.listeAnneeRemunerationPension
+  let listeAnneeRemuneration = resp.body.listeAnneeRemuneration
+  if (listeAnneeRemuneration && listeAnneeRemuneration.reverse) {
+    listeAnneeRemuneration = listeAnneeRemuneration.sort().reverse()
   }
-  return downloadDocs
+  if (listeAnneeRemunerationPension && listeAnneeRemunerationPension.reverse) {
+    listeAnneeRemunerationPension = listeAnneeRemunerationPension
+      .sort()
+      .reverse()
+  }
+
+  if (listeAnneeRemuneration || listeAnneeRemunerationPension) {
+    return {
+      yearsPaie: listeAnneeRemuneration,
+      yearsPension: listeAnneeRemunerationPension
+    }
+  } else {
+    log('warn', 'could not find year of remuneration')
+    return {}
+  }
+}
+
+function fetchFiles(year) {
+  log('info', `Fetching files paie for year ${year}`)
+  return request.get(`${baseUrl}/prive/remunerationpaie/v1?annee=${year}`, {
+    json: true
+  })
+}
+
+function fetchFilesPension(year) {
+  log('info', `Fetching files pension for year ${year}`)
+  return request.get(`${baseUrl}/prive/remunerationpension/v1?annee=${year}`, {
+    json: true
+  })
+}
+
+async function parseDocuments(files, type = 'paie') {
+  const docs = []
+  const bills = []
+  for (const file of files) {
+    // For each file get the pdf url and metadata
+    const uuid = file.documentUuid
+    // Switching url if we have pension documents
+    let fileurl = `${baseUrl}/prive/telechargerremunerationpaie/v1?documentUuid=${uuid}`
+    if (type === 'pension') {
+      fileurl = `${baseUrl}/prive/telechargerremunerationpension/v1?documentUuid=${uuid}`
+    }
+    let filename = file.nomDocument
+    // Try to replace _XX_ known type_
+    filename = filename.replace(/_AF_/, '_Attestation_fiscale_')
+    filename = filename.replace(/_AFENS_/, '_Attestation_fiscale_')
+    filename = filename.replace(/_AFPENS_/, '_Attestation_fiscale_')
+    filename = filename.replace(/_DR_/, '_Décompte_de_rappel_')
+    if (type === 'pension') {
+      filename = filename.replace(/_BP_/, '_Bulletin_de_pension_')
+      filename = filename.replace(/_BPENS_/, '_Bulletin_de_pension_')
+    } else {
+      filename = filename.replace(/_BP_/, '_Bulletin_de_paie_')
+      filename = filename.replace(/_BPENS_/, '_Bulletin_de_paie_')
+    }
+    filename = filename.replace(
+      /\.pdf$/,
+      `_${crypto
+        .createHash('sha1')
+        .update(uuid)
+        .digest('hex')
+        .substr(0, 5)}.pdf`
+    )
+
+    // Date is set to 22 of the month for easier matching, if not BP is always at 1st
+    let datePlus21 = new Date(file.dateDocument)
+    datePlus21.setDate(datePlus21.getDate() + 21)
+    const amount = parseFloat(file.libelle3.replace(' ', '').replace(',', '.'))
+    const vendor = VENDOR
+
+    // This doc have no amount in libelle3, make a file only.
+    if (
+      file.icone === 'rappel' ||
+      file.icone === 'attestation' ||
+      file.icone === 'attestation-pension'
+    ) {
+      const doc = {
+        fileurl,
+        filename,
+        vendorRef: uuid,
+        fileAttributes: {
+          metadata: {
+            datetime: utils.formatDate(new Date()),
+            datetimeLabel: 'issueDate',
+            contentAuthor: 'ensap.gouv.fr',
+            carbonCopy: true,
+            qualification: Qualification.getByLabel('other_revenue')
+          }
+        }
+      }
+      docs.push(doc)
+    } else if (file.icone === 'document' || file.icone === 'document-pension') {
+      // This doc have amount, it's a bill !
+      const doc = {
+        date: datePlus21,
+        fileurl,
+        filename,
+        amount,
+        isRefund: true,
+        vendor,
+        vendorRef: uuid,
+        type: 'income',
+        fileAttributes: {
+          metadata: {
+            datetime: utils.formatDate(new Date()),
+            datetimeLabel: 'issueDate',
+            contentAuthor: 'ensap.gouv.fr',
+            carbonCopy: true,
+            qualification: Qualification.getByLabel('pay_sheet')
+          }
+        }
+      }
+      bills.push(doc)
+    } else {
+      log(
+        'warn',
+        `Unkown type for one doc, discarding this one : ${file.icone}`
+      )
+    }
+  }
+  return { docs, bills }
 }
