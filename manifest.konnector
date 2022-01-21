@@ -1,5 +1,5 @@
 {
-  "version": "1.5.0",
+  "version": "1.6.0",
   "name": "Ensap",
   "type": "konnector",
   "language": "node",
@@ -98,8 +98,9 @@
       }
     }
   },
-  "qualification_labels":[
-    "pay_sheet"
+  "qualification_labels": [
+    "pay_sheet",
+    "other_revenue"
   ],
   "features": [
     "LOGIN_OK",
@@ -108,6 +109,6 @@
     "DOC_QUALIFICATION_V2",
     "SENTRY_V2"
   ],
-  "banksTransactionRegExp": "\\b(ddfip|drfip).*(paye|remuneration\\b",
+  "banksTransactionRegExp": "\\b(ddfip|drfip).*(paye|remuneration)\\b",
   "manifest_version": "2"
 }
