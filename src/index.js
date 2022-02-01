@@ -42,6 +42,7 @@ async function start(fields) {
         // We update the isRefund attribute if missing due to 1.5.0
         await this.saveBills(bills, fields, {
           fileIdAttributes: ['vendorRef'],
+          identifiers: ['ddfip', 'drfip', 'paye', 'remuneration'],
           shouldUpdate: function(newBill, dbEntry) {
             const result = newBill.isRefund && !dbEntry.isRefund
             return result
@@ -50,7 +51,8 @@ async function start(fields) {
       if (docs.length)
         await this.saveFiles(docs, fields, {
           contentType: 'application/pdf',
-          fileIdAttributes: ['vendorRef']
+          fileIdAttributes: ['vendorRef'],
+          identifiers: ['ddfip', 'drfip', 'paye', 'remuneration']
         })
     }
   }
