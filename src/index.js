@@ -43,7 +43,7 @@ async function start(fields) {
         await this.saveBills(bills, fields, {
           fileIdAttributes: ['vendorRef'],
           identifiers: ['ddfip', 'drfip', 'paye', 'remuneration'],
-          shouldUpdate: function(newBill, dbEntry) {
+          shouldUpdate: function (newBill, dbEntry) {
             const result = newBill.isRefund && !dbEntry.isRefund
             return result
           }
@@ -90,9 +90,7 @@ async function authenticate(login, password) {
     resp.statusCode === 200
   ) {
     return
-  } else if (
-    respBody.message.includes('bloqué')
-  ) {
+  } else if (respBody.message.includes('bloqué')) {
     log('error', respBody)
     throw new Error('LOGIN_FAILED.TOO_MANY_ATTEMPTS')
   } else {
