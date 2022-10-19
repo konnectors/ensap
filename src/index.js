@@ -85,7 +85,7 @@ async function authenticate(login, password) {
   const respBody = resp.body
 
   if (
-    respBody.message.includes('Identifiant ou mot de passe erroné') &&
+    respBody.message.includes('ou mot de passe') &&
     resp.statusCode != 200
   ) {
     throw new Error(errors.LOGIN_FAILED)
