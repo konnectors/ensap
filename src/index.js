@@ -83,11 +83,7 @@ async function authenticate(login, password) {
   })
 
   const respBody = resp.body
-
-  if (
-    respBody.message.includes('ou mot de passe') &&
-    resp.statusCode != 200
-  ) {
+  if (respBody.message.includes('ou mot de passe')) {
     throw new Error(errors.LOGIN_FAILED)
   } else if (
     respBody.message.includes('Authentification OK') &&
@@ -95,8 +91,7 @@ async function authenticate(login, password) {
   ) {
     return
   } else if (
-    respBody.message.includes('Ce compte est temporairement bloqué pendant') &&
-    resp.statusCode != 200
+    respBody.message.includes('bloqué')
   ) {
     log('error', respBody)
     throw new Error('LOGIN_FAILED.TOO_MANY_ATTEMPTS')
