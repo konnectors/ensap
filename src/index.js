@@ -32,7 +32,7 @@ async function start(fields) {
   await authenticate(fields.login, fields.password)
   await this.notifySuccessfulLogin()
 
-  const { yearsPaie } = await getYears()
+  const { yearsPaie, yearsPension } = await getYears()
   if (yearsPaie) {
     log('info', 'Found Remuneration type docs, fetching them...')
     for (const yearPaie of yearsPaie) {
@@ -60,25 +60,22 @@ async function start(fields) {
         })
     }
   }
-  // The account we have to dev is not containing any "pension"
-  // As it is suspected that all files are now returned by years independently of if it is a "pension" or a "paie"
-  // We keep this code around while verifying
-  // if (yearsPension) {
-  //   log('info', 'Found Pension type docs, fetching them...')
-  //   for (const yearPension of yearsPension) {
-  //     const files = await fetchFilesPension(yearPension)
-  //     const { docs, bills } = await parseDocuments(files, 'pension')
-  //     if (bills.length)
-  //       await this.saveBills(bills, fields, {
-  //         fileIdAttributes: ['vendorRef']
-  //       })
-  //     if (docs.length)
-  //       await this.saveFiles(docs, fields, {
-  //         contentType: 'application/pdf',
-  //         fileIdAttributes: ['vendorRef']
-  //       })
-  //   }
-  // }
+  if (yearsPension) {
+    log('info', 'Found Pension type docs, fetching them...')
+    for (const yearPension of yearsPension) {
+      const files = await fetchFilesPension(yearPension)
+      const { docs, bills } = await parseDocuments(files, 'pension')
+      if (bills.length)
+        await this.saveBills(bills, fields, {
+          fileIdAttributes: ['vendorRef']
+        })
+      if (docs.length)
+        await this.saveFiles(docs, fields, {
+          contentType: 'application/pdf',
+          fileIdAttributes: ['vendorRef']
+        })
+    }
+  }
 }
 async function authenticate(login, password) {
   const resp = await request({
@@ -107,29 +104,47 @@ async function authenticate(login, password) {
 }
 
 async function getYears() {
+  let yearsLists = {}
   // Set up XSRF-Token
-  await request({
+  const xsrfReq = await request({
     uri: `${baseUrl}/prive/initialiserhabilitation/v1`,
     method: 'POST',
-    body: {}
-  })
-  const resp = await request({
-    uri: `${baseUrl}/prive/listeranneeremunerationpaie/v1`,
-    method: 'GET',
+    body: {},
     resolveWithFullResponse: true
   })
-  let listeAnnee = resp.body.listeAnnee
-  if (listeAnnee) {
-    listeAnnee = listeAnnee.sort().reverse()
-  }
-  if (listeAnnee) {
-    return {
-      yearsPaie: listeAnnee
+  const hasRemunaration = xsrfReq.body.listeService?.remuneration
+  const hasPension = xsrfReq.body.listeService?.pension
+  let paieYearsList
+  let pensionYearsList
+  if (hasRemunaration) {
+    log('info', 'Found "remuneration" for this user, processing ...')
+    const paieResp = await request({
+      uri: `${baseUrl}/prive/listeranneeremunerationpaie/v1`,
+      method: 'GET',
+      resolveWithFullResponse: true
+    })
+    paieYearsList = paieResp.body.listeAnnee
+    if (paieYearsList) {
+      paieYearsList = paieYearsList.sort().reverse()
+      yearsLists.yearsPaie = paieYearsList
     }
-  } else {
-    log('warn', 'could not find year of remuneration')
-    return {}
   }
+  if (hasPension) {
+    log('info', 'Found "pension" for this user, processing ...')
+    const pensionResp = await request({
+      uri: `${baseUrl}/prive/listeranneeremunerationpension/v1`,
+      method: 'GET',
+      resolveWithFullResponse: true
+    })
+    pensionYearsList = pensionResp.body.listeAnnee
+    if (pensionYearsList) {
+      pensionYearsList = pensionYearsList.sort().reverse()
+      yearsLists.yearsPension = pensionYearsList
+    }
+  }
+  log('info', `yearsPaie length : ${yearsLists.yearsPaie?.length}`)
+  log('info', ` yearsPension length: ${yearsLists.yearsPension?.length}`)
+  return yearsLists
 }
 
 function fetchFiles(year) {
@@ -139,12 +154,12 @@ function fetchFiles(year) {
   })
 }
 
-// function fetchFilesPension(year) {
-//   log('info', `Fetching files pension for year ${year}`)
-//   return request.get(`${baseUrl}/prive/remunerationpension/v1?annee=${year}`, {
-//     json: true
-//   })
-// }
+function fetchFilesPension(year) {
+  log('info', `Fetching files pension for year ${year}`)
+  return request.get(`${baseUrl}/prive/remunerationpension/v1?annee=${year}`, {
+    json: true
+  })
+}
 
 async function parseDocuments(files, type = 'paie') {
   const docs = []
