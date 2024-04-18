@@ -50,6 +50,7 @@ async function start(fields) {
           // Now needed to avoid MIMETYPE errors
           validateFile: () => true
         })
+
       if (docs.length)
         await this.saveFiles(docs, fields, {
           contentType: 'application/pdf',
@@ -69,6 +70,7 @@ async function start(fields) {
         await this.saveBills(bills, fields, {
           fileIdAttributes: ['vendorRef']
         })
+
       if (docs.length)
         await this.saveFiles(docs, fields, {
           contentType: 'application/pdf',
@@ -172,27 +174,14 @@ async function parseDocuments(files, type = 'paie') {
     if (type === 'pension') {
       fileurl = `${baseUrl}/prive/telechargerremunerationpension/v1?documentUuid=${uuid}`
     }
-    let filename = file.libelle2
-    // Try to replace _XX_ known type_
-    filename = filename.replace(/_AF_/, '_Attestation_fiscale_')
-    filename = filename.replace(/_AFENS_/, '_Attestation_fiscale_')
-    filename = filename.replace(/_AFPENS_/, '_Attestation_fiscale_')
-    filename = filename.replace(/_DR_/, '_Décompte_de_rappel_')
-    if (type === 'pension') {
-      filename = filename.replace(/_BP_/, '_Bulletin_de_pension_')
-      filename = filename.replace(/_BPENS_/, '_Bulletin_de_pension_')
-    } else {
-      filename = filename.replace(/_BP_/, '_Bulletin_de_paie_')
-      filename = filename.replace(/_BPENS_/, '_Bulletin_de_paie_')
-    }
-    filename = filename.replace(
-      /\.pdf$/,
-      `_${crypto
-        .createHash('sha1')
-        .update(uuid)
-        .digest('hex')
-        .substr(0, 5)}.pdf`
-    )
+    let filename = file.libelle2.split(' (PDF')[0]
+    filename = handleFileName(filename, type, uuid)
+
+    // Added on 18-04-2024 => To remove in several month, when the majority of users will have had the correction
+    let filenameToChange = file.libelle2
+    filenameToChange = handleFileName(filenameToChange, type, uuid)
+    // ///////////////////////////////////////////////
+
     // Date is set to 22 of the month for easier matching, if not BP is always at 1st
     let datePlus21 = new Date(file.dateDocument)
     datePlus21.setDate(datePlus21.getDate() + 21)
@@ -203,6 +192,7 @@ async function parseDocuments(files, type = 'paie') {
       const doc = {
         fileurl,
         filename,
+        shouldReplaceName: filenameToChange,
         vendorRef: uuid,
         fileAttributes: {
           metadata: {
@@ -221,6 +211,7 @@ async function parseDocuments(files, type = 'paie') {
         date: datePlus21,
         fileurl,
         filename,
+        shouldReplaceName: filenameToChange,
         amount,
         isRefund: true,
         vendor,
@@ -242,4 +233,25 @@ async function parseDocuments(files, type = 'paie') {
     }
   }
   return { docs, bills }
+}
+
+function handleFileName(filename, type = 'paie', uuid) {
+  log('info', 'handleFilename starts')
+  let filenameResult
+  // Try to replace _XX_ known type_
+  filenameResult = filename.replace(/_AF_/, '_Attestation_fiscale_')
+  filenameResult = filenameResult.replace(/_AFENS_/, '_Attestation_fiscale_')
+  filenameResult = filenameResult.replace(/_AFPENS_/, '_Attestation_fiscale_')
+  filenameResult = filenameResult.replace(/_DR_/, '_Décompte_de_rappel_')
+  if (type === 'pension') {
+    filenameResult = filenameResult.replace(/_BP_/, '_Bulletin_de_pension_')
+    filenameResult = filenameResult.replace(/_BPENS_/, '_Bulletin_de_pension_')
+  } else {
+    filenameResult = filenameResult.replace(/_BP_/, '_Bulletin_de_paie_')
+    filenameResult = filenameResult.replace(/_BPENS_/, '_Bulletin_de_paie_')
+  }
+  return filenameResult.replace(
+    /\.pdf$/,
+    `_${crypto.createHash('sha1').update(uuid).digest('hex').substr(0, 5)}.pdf`
+  )
 }
