@@ -258,6 +258,7 @@ function handleFileName(filename, type = 'paie', uuid) {
   filenameResult = filenameResult.replace(/_AFENS_/, '_Attestation_fiscale_')
   filenameResult = filenameResult.replace(/_AFPENS_/, '_Attestation_fiscale_')
   filenameResult = filenameResult.replace(/_DR_/, '_Décompte_de_rappel_')
+  filenameResult = filenameResult.replace(/_BMS_/, '_Bulletin_de_solde_')
   if (type === 'pension') {
     filenameResult = filenameResult.replace(/_BP_/, '_Bulletin_de_pension_')
     filenameResult = filenameResult.replace(/_BPENS_/, '_Bulletin_de_pension_')
