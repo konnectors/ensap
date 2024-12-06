@@ -229,7 +229,22 @@ async function parseDocuments(files, type = 'paie') {
       }
       bills.push(doc)
     } else {
-      log('warn', `Unkown type for one doc, discarding this one : ${filename}`)
+      log('warn', `Unqualified type for one doc: ${filename}`)
+      const doc = {
+        fileurl,
+        filename,
+        shouldReplaceName: filenameToChange,
+        vendorRef: uuid,
+        fileAttributes: {
+          metadata: {
+            datetime: utils.formatDate(new Date()),
+            datetimeLabel: 'issueDate',
+            contentAuthor: 'ensap.gouv.fr',
+            carbonCopy: true
+          }
+        }
+      }
+      docs.push(doc)
     }
   }
   return { docs, bills }
